@@ -1,0 +1,6 @@
+venv/
+__pycache__/
+*.pyc
+checkpoints/
+*.h5
+*.weights.h5
