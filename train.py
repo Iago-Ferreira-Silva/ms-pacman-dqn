@@ -42,7 +42,7 @@ optimizer = keras.optimizers.Adam(learning_rate=1e-3)
 loss_fn = keras.losses.Huber()
 
 # ---------- 4. Replay memory ----------
-replay_memory = deque(maxlen=2000)
+replay_memory = deque(maxlen=50000)
 
 def sample_memories(batch_size):
     indices = np.random.permutation(len(replay_memory))[:batch_size]
@@ -70,7 +70,7 @@ batch_size = 32
 training_start = 200
 training_interval = 4
 copy_steps = 200
-n_steps_demo = 2000       # demonstração curta (livro usa milhões de passos)
+n_steps_demo = 500000       # demonstração curta (livro usa milhões de passos)
 save_path = "dqn_pacman_demo.weights.h5"
 
 obs, info = env.reset()
