@@ -1,2 +1,264 @@
-# Projeto de Aprendizagem por Reforço: Deep Q-Learning para Ms. Pac-Man
+# Ms. Pac-Man DQN — Deep Q-Network em TensorFlow/Keras
 
+Implementação de um agente de **Aprendizado por Reforço Profundo (Deep Reinforcement Learning)** para jogar **Ms. Pac-Man**, usando o algoritmo **Deep Q-Network (DQN)**.
+
+Este projeto foi desenvolvido como atividade prática baseada no **Capítulo 16 — "Aprendizado por Reforço"** do livro *Mãos à Obra: Aprendizado de Máquina com Scikit-Learn & TensorFlow*, de Aurélien Géron, para a disciplina de **Tópicos Especiais em Sistemas de Informação** (Prof. Robson Gonçalves Fechine Feitosa), no curso de Sistemas de Informação do **IFCE — Campus Crato**.
+
+> **Autor:** Iago Ferreira Silva & Antônio Alexandre Alves Silva
+
+---
+
+## Índice
+
+- [Sobre o projeto](#sobre-o-projeto)
+- [O que é um DQN, em resumo](#o-que-é-um-dqn-em-resumo)
+- [Modernização em relação ao livro](#modernização-em-relação-ao-livro)
+- [Estrutura do projeto](#estrutura-do-projeto)
+- [Explicação detalhada de cada arquivo](#explicação-detalhada-de-cada-arquivo)
+  - [`explore_env.py`](#explore_envpy)
+  - [`preprocess.py`](#preprocesspy)
+  - [`dqn_model.py`](#dqn_modelpy)
+  - [`replay_memory.py`](#replay_memorypy)
+  - [`epsilon_greedy.py`](#epsilon_greedypy)
+  - [`train.py`](#trainpy)
+  - [`evaluate.py`](#evaluatepy)
+  - [`requirements.txt`](#requirementstxt)
+  - [`.gitignore`](#gitignore)
+- [Como rodar o projeto do zero](#como-rodar-o-projeto-do-zero)
+- [Resultados obtidos](#resultados-obtidos)
+- [Limitações desta demonstração](#limitações-desta-demonstração)
+- [Referências](#referências)
+
+---
+
+## Sobre o projeto
+
+O objetivo foi reproduzir, de forma fiel à arquitetura e à lógica descritas no livro, um agente de Aprendizado por Reforço capaz de jogar Ms. Pac-Man a partir de imagens brutas da tela do jogo — sem nenhuma informação além dos pixels e da recompensa (pontuação).
+
+O projeto foi construído **passo a passo**, em etapas incrementais, cada uma validando uma parte específica do pipeline antes de seguir para a próxima:
+
+1. Exploração do ambiente de jogo
+2. Pré-processamento das imagens
+3. Construção da rede neural (arquitetura DQN)
+4. Memória de repetição (replay memory)
+5. Política de exploração (epsilon-greedy)
+6. Loop de treino completo
+7. Avaliação do agente treinado
+
+## O que é um DQN, em resumo
+
+Um **Deep Q-Network** é uma técnica de Aprendizado por Reforço que usa uma rede neural para estimar os **Q-values** — o retorno total esperado (recompensa futura descontada) de se tomar cada ação possível em um determinado estado (no nosso caso, uma imagem do jogo).
+
+Em vez de guardar uma tabela de valores para cada combinação possível de estado/ação (inviável quando o estado é uma imagem), a rede neural **aprende a aproximar** esses valores. O agente então escolhe, a cada passo, a ação com maior Q-value estimado — ou, durante o treino, às vezes uma ação aleatória, para continuar explorando o ambiente (ver [`epsilon_greedy.py`](#epsilon_greedypy)).
+
+Dois mecanismos do algoritmo, usados neste projeto, merecem destaque por resolverem problemas práticos de estabilidade do treino:
+
+- **Replay memory:** evita treinar com experiências muito correlacionadas (frames consecutivos do jogo), guardando experiências passadas e sorteando lotes aleatórios delas para treinar.
+- **Rede online + rede alvo (target network):** duas cópias da mesma rede. A rede *online* é a que treina a cada passo; a rede *alvo* fornece os valores de referência (alvos) do treino e só é atualizada periodicamente, evitando que o alvo do treino mude a cada passo e desestabilize o aprendizado.
+
+## Modernização em relação ao livro
+
+O livro foi publicado em 2019 e usa bibliotecas hoje obsoletas: **TensorFlow 1.x** (com `placeholder`, sessões e `tf.contrib`) e a biblioteca `gym` original da OpenAI (hoje descontinuada). Para rodar em um ambiente atual, o projeto foi reescrito com bibliotecas modernas, **mantendo a mesma arquitetura e a mesma lógica do algoritmo** descritas no livro:
+
+| Livro (2019) | Este projeto (atual) |
+|---|---|
+| TensorFlow 1.x (`placeholder`, `Session`) | TensorFlow 2 / Keras (`keras.Sequential`, `tf.GradientTape`) |
+| `gym` (OpenAI, descontinuado) | `gymnasium` (sucessor oficial, mantido pela Farama Foundation) |
+| Ambiente Atari via `gym[atari]` | `ale-py` (Arcade Learning Environment), ambiente `ALE/MsPacman-v5` |
+
+## Estrutura do projeto
+
+```
+ms_pacman_dqn/
+├── venv/                        # ambiente virtual Python (não versionado)
+├── explore_env.py                # Etapa 2 — exploração do ambiente
+├── preprocess.py                 # Etapa 3 — pré-processamento das imagens
+├── dqn_model.py                  # Etapa 4 — arquitetura da rede neural (CNN)
+├── replay_memory.py               # Etapa 5 — memória de repetição
+├── epsilon_greedy.py              # Etapa 6 — política de exploração
+├── train.py                       # Etapa 7 — loop de treino completo
+├── evaluate.py                    # Etapa 8 — avaliação do agente treinado
+├── dqn_pacman_demo.weights.h5      # pesos treinados (não versionado)
+├── requirements.txt                # dependências do projeto
+├── .gitignore
+└── README.md
+```
+
+## Explicação detalhada de cada arquivo
+
+### `explore_env.py`
+
+**Objetivo:** entender o ambiente de jogo antes de desenvolver qualquer lógica de IA.
+
+Cria o ambiente `ALE/MsPacman-v5` (via `gymnasium` + `ale_py`) e inspeciona:
+- **Formato da observação:** a tela do jogo é devolvida como uma imagem RGB de `(210, 160, 3)` — 210 pixels de altura, 160 de largura, 3 canais de cor.
+- **Espaço de ações:** `Discrete(9)` — 9 ações possíveis (`NOOP`, `UP`, `RIGHT`, `LEFT`, `DOWN` e as 4 diagonais).
+
+Esse script não faz parte do pipeline de treino em si; serve apenas como etapa de reconhecimento, confirmando os formatos de dados que as próximas etapas precisam tratar.
+
+### `preprocess.py`
+
+**Objetivo:** transformar a imagem bruta do jogo em algo mais leve e adequado para alimentar a rede neural.
+
+A função principal, `preprocess_observation(obs)`, faz quatro transformações, nessa ordem:
+
+1. **Recorte e subamostragem** (`obs[1:176:2, ::2]`): corta partes irrelevantes da imagem (como o placar) e reduz a resolução pela metade, pegando 1 a cada 2 pixels em cada eixo.
+2. **Conversão para escala de cinza** (`img.sum(axis=2, dtype=np.int32)`): soma os 3 canais de cor (R+G+B) em um único valor por pixel, eliminando a dimensão de cor. É importante forçar o tipo `int32` aqui — sem isso, o NumPy mantém o resultado como inteiro sem sinal (`uint64`), o que causa um erro sutil de *overflow* (estouro) na etapa seguinte.
+3. **Melhora de contraste:** zera uma cor de fundo específica do jogo (`mspacman_color`), destacando os elementos relevantes (Pac-Man, fantasmas, paredes, pastilhas).
+4. **Normalização:** reescala os valores de pixel para o intervalo `[-1, 1]`, o que ajuda a rede neural a treinar de forma mais estável.
+
+O resultado é uma imagem de `(88, 80, 1)` — bem menor que o original `(210, 160, 3)` e sem informação de cor — pronta para ser usada como entrada da rede neural.
+
+Esse arquivo também inclui um bloco de teste (`if __name__ == "__main__"`) que gera um gráfico comparando a imagem original com a pré-processada, usando `matplotlib`.
+
+### `dqn_model.py`
+
+**Objetivo:** definir a arquitetura da rede neural convolucional (CNN) que estima os Q-values.
+
+A função `build_q_network()` monta a rede com `keras.Sequential`:
+
+| Camada | Função |
+|---|---|
+| `Conv2D(32, kernel_size=8, strides=4)` | Primeira camada convolucional — extrai padrões visuais básicos da imagem pré-processada |
+| `Conv2D(64, kernel_size=4, strides=2)` | Segunda convolução — combina os padrões anteriores em características mais complexas |
+| `Conv2D(64, kernel_size=3, strides=1)` | Terceira convolução — refina ainda mais as características extraídas |
+| `Flatten()` | Achata o resultado 2D das convoluções em um vetor 1D |
+| `Dense(512, activation="relu")` | Camada totalmente conectada, combina todas as características extraídas |
+| `Dense(n_outputs)` | Camada de saída — um neurônio por ação possível (9 no total), cada um estimando o Q-value daquela ação |
+
+Ao todo, essa rede tem **3.681.449 parâmetros treináveis**. A entrada é a imagem pré-processada `(88, 80, 1)`, e a saída são 9 valores numéricos (os Q-values de cada ação — sem função de ativação na última camada, já que são valores livres, não probabilidades).
+
+Essa mesma função é reutilizada mais tarde (em `train.py` e `evaluate.py`) para criar **duas cópias independentes** da rede: a rede *online* (que treina) e a rede *alvo* (que fornece valores de referência estáveis).
+
+### `replay_memory.py`
+
+**Objetivo:** implementar a memória de repetição (replay memory), que resolve o problema de dados sequenciais muito correlacionados.
+
+- `replay_memory = deque(maxlen=2000)`: uma fila de tamanho fixo. Quando atinge o limite, as experiências mais antigas são descartadas automaticamente para dar lugar às novas.
+- `sample_memories(batch_size)`: sorteia aleatoriamente um lote (`batch`) de experiências armazenadas, cada uma no formato `(estado, ação, recompensa, próximo_estado, continua?)`, e organiza tudo em arrays NumPy prontos para o treino.
+
+Esse arquivo inclui um teste standalone com dados falsos (`fake_state`, `fake_action`, etc.) só para validar que a lógica de armazenamento e sorteio funciona corretamente, sem precisar rodar o jogo de verdade.
+
+### `epsilon_greedy.py`
+
+**Objetivo:** implementar a política de ação do agente, equilibrando exploração e aproveitamento.
+
+A função `epsilon_greedy(q_values, step, n_outputs)` decide a ação do agente:
+- Com probabilidade `epsilon`, escolhe uma ação **aleatória** (explora o ambiente, descobrindo novas estratégias).
+- Caso contrário, escolhe a ação de **maior Q-value** segundo a rede (aproveita o que já foi aprendido).
+
+O valor de `epsilon` começa em `1.0` (100% de exploração) e decai linearmente até `0.1` (10%) ao longo de `eps_decay_steps = 20000` passos, permanecendo nesse mínimo depois disso. Essa é a estratégia clássica de **exploration vs. exploitation**: no início do treino, o agente explora bastante (ainda não sabe nada); com o tempo, passa a confiar mais na rede, mas nunca para de explorar completamente.
+
+### `train.py`
+
+**Objetivo:** o arquivo mais importante do projeto — junta todos os componentes anteriores em um loop de treino completo.
+
+Principais blocos do script, na ordem em que aparecem:
+
+1. **Ambiente** — cria o `ALE/MsPacman-v5`.
+2. **Pré-processamento** — reaproveita a função de `preprocess.py`.
+3. **Redes neurais** — cria `online_model` e `target_model` (duas instâncias de `build_q_network()`), e sincroniza os pesos da rede alvo com os da rede online no início (`target_model.set_weights(online_model.get_weights())`).
+4. **Replay memory** — reaproveita a lógica de `replay_memory.py`.
+5. **Epsilon-greedy** — reaproveita a lógica de `epsilon_greedy.py`.
+6. **Loop de treino**, que a cada passo:
+   - Observa o estado atual (imagem pré-processada) e escolhe uma ação via epsilon-greedy.
+   - Executa a ação no ambiente, observa a recompensa e o próximo estado.
+   - Guarda essa experiência na replay memory.
+   - A cada `training_interval = 4` passos (depois de `training_start = 200` passos iniciais, para já ter experiências suficientes na memória), sorteia um lote da replay memory e treina a rede online:
+     - Calcula os **Q-values alvo** usando a rede *alvo*: `y_targets = rewards + continues * discount_rate * max_next_q_values` (a fórmula de Bellman, com `discount_rate = 0.95`).
+     - Usa `tf.GradientTape()` para calcular o gradiente da função de perda (`Huber loss`, mais robusta a valores extremos que o erro quadrático médio) entre os Q-values previstos pela rede online e os alvos calculados.
+     - Aplica o gradiente com o otimizador Adam, atualizando os pesos da rede online.
+   - A cada `copy_steps = 200` passos, copia os pesos da rede online para a rede alvo — é isso que estabiliza o treino, evitando que o "alvo" do aprendizado fique mudando a cada passo.
+7. Ao final, salva os pesos treinados em `dqn_pacman_demo.weights.h5`.
+
+> **Nota sobre o escopo do treino:** o livro descreve um treino de **milhões de passos**, levando dias para rodar. Para fins de demonstração acadêmica (validar que o pipeline inteiro funciona corretamente de ponta a ponta), este projeto roda apenas `n_steps_demo = 2000` passos — o suficiente para confirmar que o agente realmente aprende algo (ainda que pouco) e que não há erros na implementação, mas insuficiente para produzir um agente competente no jogo.
+
+### `evaluate.py`
+
+**Objetivo:** carregar os pesos treinados e observar o agente jogando, usando apenas o que foi aprendido (sem exploração aleatória).
+
+- Recria a mesma arquitetura de `dqn_model.py` e carrega os pesos salvos por `train.py` (`model.load_weights("dqn_pacman_demo.weights.h5")`).
+- Roda `n_episodes = 3` episódios completos, em cada um escolhendo sempre a ação de maior Q-value (`np.argmax(q_values)`, sem `epsilon`).
+- Usa `render_mode="human"`, que abre uma janela mostrando o jogo rodando em tempo real.
+- Imprime a recompensa total de cada episódio ao final.
+
+Como o treino desta demonstração foi muito curto, o agente aprendeu pouco, mas o script cumpre seu papel: validar que os pesos treinados podem ser recarregados e usados para tomar decisões em tempo real no ambiente.
+
+### `requirements.txt`
+
+Lista de todas as dependências Python do projeto (geradas com `pip freeze`), incluindo as bibliotecas principais:
+
+- `tensorflow` — framework de redes neurais (Keras incluso)
+- `gymnasium` — biblioteca de ambientes de Aprendizado por Reforço (sucessora do `gym`)
+- `ale-py` — Arcade Learning Environment, fornece os jogos Atari (incluindo Ms. Pac-Man)
+- `numpy` — operações numéricas e manipulação de arrays
+- `matplotlib` — visualização (usado em `preprocess.py` para comparar imagens)
+
+Permite que qualquer pessoa recrie o ambiente exato do projeto com:
+```powershell
+pip install -r requirements.txt
+```
+
+### `.gitignore`
+
+Define o que **não** deve ser versionado no Git:
+
+```
+venv/
+__pycache__/
+*.pyc
+checkpoints/
+*.h5
+*.weights.h5
+```
+
+- `venv/` — o ambiente virtual Python não deve ir para o repositório (é específico de cada máquina; quem for rodar o projeto recria o seu próprio com `requirements.txt`).
+- `__pycache__/`, `*.pyc` — arquivos de cache gerados automaticamente pelo Python.
+- `*.h5`, `*.weights.h5`, `checkpoints/` — os pesos treinados são arquivos binários grandes, não fazem sentido versionados em um repositório de código.
+
+## Como rodar o projeto do zero
+
+```powershell
+# 1. Criar e ativar o ambiente virtual
+python -m venv venv
+venv\Scripts\Activate.ps1
+
+# 2. Instalar as dependências
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+
+# 3. (Opcional) Explorar o ambiente
+python explore_env.py
+
+# 4. (Opcional) Visualizar o pré-processamento
+python preprocess.py
+
+# 5. (Opcional) Ver o resumo da arquitetura da rede
+python dqn_model.py
+
+# 6. Treinar o agente (demonstração curta, ~2000 passos)
+python train.py
+
+# 7. Avaliar o agente treinado (abre uma janela com o jogo)
+python evaluate.py
+```
+
+## Resultados obtidos
+
+- O treino de demonstração (2000 passos) completou **3 episódios** do jogo, com recompensas de **230, 210 e 240 pontos**.
+- Na avaliação final, o agente treinado obteve **70 pontos** em cada um dos 3 episódios — um resultado idêntico nos três, já que a avaliação usa sempre a ação de maior Q-value (sem aleatoriedade) e o ambiente reinicia sempre do mesmo estado, levando o agente a repetir exatamente a mesma sequência de ações.
+
+## Limitações desta demonstração
+
+- **Treino muito curto:** o livro treina o agente por milhões de passos; aqui foram usados apenas 2000, por restrição de tempo/recursos. O agente não chega a desenvolver uma estratégia sofisticada de jogo.
+- **Replay memory pequena:** `maxlen=2000`, menor que o recomendado para treinos longos, mas suficiente para esta demonstração.
+- **Sem checkpoints intermediários:** o livro salva o progresso periodicamente para poder retomar um treino longo; aqui, como o treino é curto, isso não foi necessário.
+
+Essas limitações foram uma escolha deliberada: o foco do projeto foi reproduzir **corretamente a arquitetura e a lógica do algoritmo DQN** descrito no livro, validando cada etapa do pipeline, e não produzir um agente competitivo.
+
+## Referências
+
+- GÉRON, Aurélien. *Mãos à Obra: Aprendizado de Máquina com Scikit-Learn & TensorFlow*. Capítulo 16 — Aprendizado por Reforço. O'Reilly / Alta Books, 2019.
+- [Gymnasium (Farama Foundation)](https://gymnasium.farama.org/)
+- [Arcade Learning Environment (ALE)](https://github.com/Farama-Foundation/Arcade-Learning-Environment)
+- [TensorFlow / Keras](https://www.tensorflow.org/)
