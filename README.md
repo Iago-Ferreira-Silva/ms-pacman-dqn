@@ -4,7 +4,7 @@ Implementação de um agente de **Aprendizado por Reforço Profundo (Deep Reinfo
 
 Este projeto foi desenvolvido como atividade prática baseada no **Capítulo 16 — "Aprendizado por Reforço"** do livro *Mãos à Obra: Aprendizado de Máquina com Scikit-Learn & TensorFlow*, de Aurélien Géron, para a disciplina de **Tópicos Especiais em Sistemas de Informação** (Prof. Robson Gonçalves Fechine Feitosa), no curso de Sistemas de Informação do **IFCE — Campus Crato**.
 
-> **Autor:** Iago Ferreira Silva
+> **Autor:** Iago Ferreira Silva & Antônio Alexandre Alves Silva
 
 ---
 
@@ -190,7 +190,7 @@ Com o treino de 500.000 passos, o agente carregado aqui já joga de forma bastan
 
 ### `play.py`
 
-**Objetivo:** uma versão mais flexível do `evaluate.py` para assistir ao agente jogando, criada pelo colega de equipe. Permite comparar lado a lado o comportamento **antes e depois do treino**, direto pela linha de comando.
+**Objetivo:** uma versão mais flexível do `evaluate.py` para assistir ao agente jogando, criada pelo colega de equipe (Alexandre). Permite comparar lado a lado o comportamento **antes e depois do treino**, direto pela linha de comando.
 
 Principais diferenças em relação ao `evaluate.py`:
 
