@@ -4,7 +4,7 @@ Implementação de um agente de **Aprendizado por Reforço Profundo (Deep Reinfo
 
 Este projeto foi desenvolvido como atividade prática baseada no **Capítulo 16 — "Aprendizado por Reforço"** do livro *Mãos à Obra: Aprendizado de Máquina com Scikit-Learn & TensorFlow*, de Aurélien Géron, para a disciplina de **Tópicos Especiais em Sistemas de Informação** (Prof. Robson Gonçalves Fechine Feitosa), no curso de Sistemas de Informação do **IFCE — Campus Crato**.
 
-> **Autor:** Iago Ferreira Silva & Antônio Alexandre Alves Silva
+> **Autor:** Iago Ferreira Silva
 
 ---
 
@@ -26,7 +26,7 @@ Este projeto foi desenvolvido como atividade prática baseada no **Capítulo 16 
   - [`.gitignore`](#gitignore)
 - [Como rodar o projeto do zero](#como-rodar-o-projeto-do-zero)
 - [Resultados obtidos](#resultados-obtidos)
-- [Limitações desta demonstração](#limitações-desta-demonstração)
+- [Limitações deste projeto](#limitações-deste-projeto)
 - [Referências](#referências)
 
 ---
@@ -135,6 +135,8 @@ Essa mesma função é reutilizada mais tarde (em `train.py` e `evaluate.py`) pa
 **Objetivo:** implementar a memória de repetição (replay memory), que resolve o problema de dados sequenciais muito correlacionados.
 
 - `replay_memory = deque(maxlen=2000)`: uma fila de tamanho fixo. Quando atinge o limite, as experiências mais antigas são descartadas automaticamente para dar lugar às novas.
+
+> **Nota:** este arquivo é um exemplo isolado, só para validar a lógica da replay memory (daí o `maxlen` pequeno, de `2000`). O `train.py` tem sua **própria cópia** dessa mesma lógica embutida nele (não importa este arquivo), e nela o `maxlen` foi ampliado para `50000` — ver a seção de [`train.py`](#trainpy).
 - `sample_memories(batch_size)`: sorteia aleatoriamente um lote (`batch`) de experiências armazenadas, cada uma no formato `(estado, ação, recompensa, próximo_estado, continua?)`, e organiza tudo em arrays NumPy prontos para o treino.
 
 Esse arquivo inclui um teste standalone com dados falsos (`fake_state`, `fake_action`, etc.) só para validar que a lógica de armazenamento e sorteio funciona corretamente, sem precisar rodar o jogo de verdade.
@@ -158,7 +160,7 @@ Principais blocos do script, na ordem em que aparecem:
 1. **Ambiente** — cria o `ALE/MsPacman-v5`.
 2. **Pré-processamento** — reaproveita a função de `preprocess.py`.
 3. **Redes neurais** — cria `online_model` e `target_model` (duas instâncias de `build_q_network()`), e sincroniza os pesos da rede alvo com os da rede online no início (`target_model.set_weights(online_model.get_weights())`).
-4. **Replay memory** — reaproveita a lógica de `replay_memory.py`.
+4. **Replay memory** — mesma lógica de `replay_memory.py` (implementada como uma cópia própria dentro deste arquivo, não uma importação), mas com `maxlen=50000` em vez de `2000`, para suportar o treino mais longo.
 5. **Epsilon-greedy** — reaproveita a lógica de `epsilon_greedy.py`.
 6. **Loop de treino**, que a cada passo:
    - Observa o estado atual (imagem pré-processada) e escolhe uma ação via epsilon-greedy.
@@ -171,7 +173,7 @@ Principais blocos do script, na ordem em que aparecem:
    - A cada `copy_steps = 200` passos, copia os pesos da rede online para a rede alvo — é isso que estabiliza o treino, evitando que o "alvo" do aprendizado fique mudando a cada passo.
 7. Ao final, salva os pesos treinados em `dqn_pacman_demo.weights.h5`.
 
-> **Nota sobre o escopo do treino:** o livro descreve um treino de **milhões de passos**, levando dias para rodar. Para fins de demonstração acadêmica (validar que o pipeline inteiro funciona corretamente de ponta a ponta), este projeto roda apenas `n_steps_demo = 2000` passos — o suficiente para confirmar que o agente realmente aprende algo (ainda que pouco) e que não há erros na implementação, mas insuficiente para produzir um agente competente no jogo.
+> **Nota sobre o escopo do treino:** o livro descreve um treino de **milhões de passos**, levando dias para rodar. Este projeto roda `n_steps_demo = 500000` passos (meio milhão) — bem menor que o do livro, mas já suficiente para o agente sair do comportamento quase aleatório inicial e desenvolver uma estratégia de jogo consistente (ver [Resultados obtidos](#resultados-obtidos)). Esse valor começou em `2000` passos (uma validação rápida do pipeline completo) e foi ampliado para `500000`, junto com o aumento da replay memory, para produzir um agente mais capaz. Com o hardware usado, esse treino levou aproximadamente 30 horas.
 
 ### `evaluate.py`
 
@@ -182,7 +184,7 @@ Principais blocos do script, na ordem em que aparecem:
 - Usa `render_mode="human"`, que abre uma janela mostrando o jogo rodando em tempo real.
 - Imprime a recompensa total de cada episódio ao final.
 
-Como o treino desta demonstração foi muito curto, o agente aprendeu pouco, mas o script cumpre seu papel: validar que os pesos treinados podem ser recarregados e usados para tomar decisões em tempo real no ambiente.
+Com o treino de 500.000 passos, o agente carregado aqui já joga de forma bastante mais consistente do que no treino inicial de validação (ver [Resultados obtidos](#resultados-obtidos)).
 
 ### `requirements.txt`
 
@@ -236,7 +238,7 @@ python preprocess.py
 # 5. (Opcional) Ver o resumo da arquitetura da rede
 python dqn_model.py
 
-# 6. Treinar o agente (demonstração curta, ~2000 passos)
+# 6. Treinar o agente (500.000 passos — pode levar muitas horas)
 python train.py
 
 # 7. Avaliar o agente treinado (abre uma janela com o jogo)
@@ -245,16 +247,22 @@ python evaluate.py
 
 ## Resultados obtidos
 
-- O treino de demonstração (2000 passos) completou **3 episódios** do jogo, com recompensas de **230, 210 e 240 pontos**.
-- Na avaliação final, o agente treinado obteve **70 pontos** em cada um dos 3 episódios — um resultado idêntico nos três, já que a avaliação usa sempre a ação de maior Q-value (sem aleatoriedade) e o ambiente reinicia sempre do mesmo estado, levando o agente a repetir exatamente a mesma sequência de ações.
+- O treino completo (500.000 passos) rodou por aproximadamente 30 horas. Ao longo do treino, as recompensas por episódio foram, de forma geral, crescendo e ficando mais consistentes: nos primeiros passos os episódios terminavam rápido com pontuações baixas, enquanto próximo do final já apareciam episódios de **800, 900, 990 e até 1530 pontos**.
+- Na avaliação final (`evaluate.py`, agente já treinado, sem exploração aleatória), o agente obteve **470, 490 e 870 pontos** nos 3 episódios — valores bem mais altos e consistentes do que o treino inicial de validação (que obtinha 70 pontos, repetidos de forma idêntica nos 3 episódios). Os resultados variam um pouco entre episódios porque o ambiente `ALE/MsPacman-v5` tem uma pequena aleatoriedade interna por padrão (*sticky actions*: às vezes repete a ação anterior em vez da escolhida pela política), então mesmo uma política puramente gulosa (greedy) não repete exatamente a mesma partida a cada vez.
 
-## Limitações desta demonstração
+### Histórico: da validação rápida ao treino completo
 
-- **Treino muito curto:** o livro treina o agente por milhões de passos; aqui foram usados apenas 2000, por restrição de tempo/recursos. O agente não chega a desenvolver uma estratégia sofisticada de jogo.
-- **Replay memory pequena:** `maxlen=2000`, menor que o recomendado para treinos longos, mas suficiente para esta demonstração.
-- **Sem checkpoints intermediários:** o livro salva o progresso periodicamente para poder retomar um treino longo; aqui, como o treino é curto, isso não foi necessário.
+O projeto passou por duas fases de treino:
 
-Essas limitações foram uma escolha deliberada: o foco do projeto foi reproduzir **corretamente a arquitetura e a lógica do algoritmo DQN** descrito no livro, validando cada etapa do pipeline, e não produzir um agente competitivo.
+1. **Validação do pipeline (2000 passos, replay memory de 2000):** usada para confirmar rapidamente que todo o pipeline (ambiente → pré-processamento → rede → memória → treino) funcionava sem erros, antes de investir tempo em um treino longo. Resultado: 3 episódios com recompensas de 230, 210 e 240 pontos durante o treino, e 70 pontos (repetidos) na avaliação — o agente mal havia começado a aprender.
+2. **Treino completo (500.000 passos, replay memory de 50000):** parâmetros ampliados para dar ao agente tempo e memória suficientes para de fato aprender uma estratégia de jogo, com os resultados descritos acima.
+
+## Limitações deste projeto
+
+- **Treino menor que o do livro:** o livro treina o agente por milhões de passos, ao longo de dias; aqui foram usados 500.000 passos (~30 horas), por restrição de tempo/recursos. O agente aprendeu uma estratégia real, mas ainda aquém do que um treino de milhões de passos produziria.
+- **Sem checkpoints intermediários:** o livro salva o progresso periodicamente para poder retomar um treino longo; aqui os pesos só são salvos ao final do loop, então uma interrupção no meio do treino perde todo o progresso.
+
+Essas limitações foram uma escolha deliberada: o foco do projeto foi reproduzir **corretamente a arquitetura e a lógica do algoritmo DQN** descrito no livro, validando cada etapa do pipeline antes de escalar para um treino mais longo.
 
 ## Referências
 
