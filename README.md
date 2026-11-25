@@ -4,7 +4,7 @@ Implementação de um agente de **Aprendizado por Reforço Profundo (Deep Reinfo
 
 Este projeto foi desenvolvido como atividade prática baseada no **Capítulo 16 — "Aprendizado por Reforço"** do livro *Mãos à Obra: Aprendizado de Máquina com Scikit-Learn & TensorFlow*, de Aurélien Géron, para a disciplina de **Tópicos Especiais em Sistemas de Informação** (Prof. Robson Gonçalves Fechine Feitosa), no curso de Sistemas de Informação do **IFCE — Campus Crato**.
 
-> **Autor:** Iago Ferreira Silva & Antônio Alexandre Alves Silva
+> **Autores:** Iago Ferreira Silva & Antônio Alexandre Alves Silva
 
 ---
 
