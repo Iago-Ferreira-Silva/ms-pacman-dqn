@@ -22,6 +22,7 @@ Este projeto foi desenvolvido como atividade prática baseada no **Capítulo 16 
   - [`epsilon_greedy.py`](#epsilon_greedypy)
   - [`train.py`](#trainpy)
   - [`evaluate.py`](#evaluatepy)
+  - [`play.py`](#playpy)
   - [`requirements.txt`](#requirementstxt)
   - [`.gitignore`](#gitignore)
 - [Como rodar o projeto do zero](#como-rodar-o-projeto-do-zero)
@@ -78,6 +79,7 @@ ms_pacman_dqn/
 ├── epsilon_greedy.py              # Etapa 6 — política de exploração
 ├── train.py                       # Etapa 7 — loop de treino completo
 ├── evaluate.py                    # Etapa 8 — avaliação do agente treinado
+├── play.py                        # extra — assiste ao agente jogando, aleatório ou treinado, via linha de comando
 ├── dqn_pacman_demo.weights.h5      # pesos treinados (não versionado)
 ├── requirements.txt                # dependências do projeto
 ├── .gitignore
@@ -185,6 +187,31 @@ Principais blocos do script, na ordem em que aparecem:
 - Imprime a recompensa total de cada episódio ao final.
 
 Com o treino de 500.000 passos, o agente carregado aqui já joga de forma bastante mais consistente do que no treino inicial de validação (ver [Resultados obtidos](#resultados-obtidos)).
+
+### `play.py`
+
+**Objetivo:** uma versão mais flexível do `evaluate.py` para assistir ao agente jogando, criada pelo colega de equipe. Permite comparar lado a lado o comportamento **antes e depois do treino**, direto pela linha de comando.
+
+Principais diferenças em relação ao `evaluate.py`:
+
+- **Dois modos**, escolhidos pelo argumento `--mode`:
+  - `random` (padrão): o agente escolhe ações aleatórias (`env.action_space.sample()`) — serve como "linha de base", mostrando como o jogo se comporta sem nenhum aprendizado.
+  - `trained`: carrega os pesos salvos (`model.load_weights(...)`) e usa a rede treinada, escolhendo sempre a ação de maior Q-value — igual ao `evaluate.py`.
+- **Argumentos de linha de comando** (via `argparse`), que tornam o script reutilizável sem precisar editar o código:
+  - `--weights`: caminho do arquivo de pesos (padrão: `dqn_pacman_demo.weights.h5`).
+  - `--episodes`: quantos episódios assistir (padrão: 2).
+  - `--speed`: pausa (em segundos) entre cada frame, útil para deixar a visualização mais lenta e fácil de acompanhar (padrão: 0.03s; `0` roda na velocidade máxima).
+- **Tratamento de erro ao carregar os pesos:** se o arquivo de pesos não existir (por exemplo, antes de rodar o `train.py`), o script avisa com uma mensagem clara em vez de travar com um erro genérico.
+- Chama `env.render()` explicitamente a cada passo do loop, garantindo que a janela do jogo seja atualizada quadro a quadro.
+
+Exemplos de uso:
+```powershell
+python play.py --mode random                                    # ve o agente sem treino nenhum
+python play.py --mode trained                                   # ve o agente treinado
+python play.py --mode trained --episodes 3 --speed 0.02          # 3 episodios, mais rapido
+```
+
+Esse script é especialmente útil para apresentações: rodar primeiro em `--mode random` e depois em `--mode trained` evidencia visualmente o quanto o agente aprendeu.
 
 ### `requirements.txt`
 
